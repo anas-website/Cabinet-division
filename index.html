@@ -3,31 +3,35 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Cabinet Divider App</title>
+    <title>Cabinet Divider Pro</title>
     <style>
         :root {
             --primary: #2563eb;
+            --success: #16a34a;
+            --warning: #ca8a04;
             --bg: #f8fafc;
             --surface: #ffffff;
             --border: #cbd5e1;
-            --cell-bg: #e2e8f0;
-            --cell-border: #64748b;
+            --cell-bg: #bfdbfe;
+            --cell-border: #3b82f6;
+            --cell-active: #1d4ed8;
         }
 
         body {
             font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
             background-color: var(--bg);
             margin: 0;
-            padding: 20px;
+            padding: 15px;
             display: flex;
             flex-direction: column;
             align-items: center;
-            color: #333;
+            color: #1e293b;
+            padding-bottom: 80px; /* Space for scrolling */
         }
 
-        h2 { margin-top: 0; font-size: 1.2rem; }
+        h2 { margin-top: 0; font-size: 1.1rem; margin-bottom: 10px;}
 
-        /* Controls Container */
+        /* Controls */
         .controls {
             background: var(--surface);
             padding: 15px;
@@ -36,7 +40,7 @@
             width: 100%;
             max-width: 400px;
             box-sizing: border-box;
-            margin-bottom: 20px;
+            margin-bottom: 15px;
         }
 
         .input-group {
@@ -45,65 +49,70 @@
             margin-bottom: 15px;
         }
 
-        .input-wrapper {
-            flex: 1;
-        }
+        .input-wrapper { flex: 1; }
 
         label {
             display: block;
-            font-size: 0.8rem;
-            color: #666;
+            font-size: 0.75rem;
+            color: #64748b;
             margin-bottom: 4px;
+            font-weight: 500;
         }
 
         input[type="number"] {
             width: 100%;
-            padding: 10px;
+            padding: 12px;
             border: 1px solid var(--border);
-            border-radius: 6px;
+            border-radius: 8px;
             font-size: 1rem;
             box-sizing: border-box;
-            -moz-appearance: textfield; /* Remove arrows */
+            background: #fff;
+        }
+        
+        input[type="number"]:focus {
+            outline: 2px solid var(--primary);
+            border-color: transparent;
         }
 
+        /* Buttons */
+        .btn-group { display: flex; gap: 8px; flex-wrap: wrap; }
+        
         button {
-            width: 100%;
+            flex: 1;
             padding: 12px;
             border: none;
-            border-radius: 6px;
-            font-size: 1rem;
+            border-radius: 8px;
+            font-size: 0.95rem;
             font-weight: 600;
             cursor: pointer;
-            transition: opacity 0.2s;
+            white-space: nowrap;
         }
 
-        button:active { opacity: 0.8; }
+        .btn-primary { background-color: var(--primary); color: white; min-width: 100%; }
+        .btn-success { background-color: var(--success); color: white; }
+        .btn-danger { background-color: #ef4444; color: white; }
+        .btn-outline { background-color: white; border: 1px solid var(--border); color: #475569; }
+        .btn-warning { background-color: var(--warning); color: white; display: none; } /* Hidden by default */
 
-        .btn-primary { background-color: var(--primary); color: white; }
-        .btn-secondary { background-color: #ef4444; color: white; margin-top: 10px;}
-        .btn-outline { background-color: transparent; border: 1px solid var(--primary); color: var(--primary); margin-top: 10px;}
-
-        /* The Cabinet Drawing Area */
+        /* Drawing Area */
         #drawing-container {
             width: 100%;
             max-width: 400px;
-            display: flex;
-            justify-content: center;
-            align-items: center;
-            /* Reserve space */
-            min-height: 300px; 
-            background-color: #e5e5e5;
+            background-color: #e2e8f0;
             border-radius: 8px;
             padding: 20px;
             box-sizing: border-box;
             overflow: hidden;
+            min-height: 300px;
+            display: flex;
+            justify-content: center;
+            align-items: center;
         }
 
         #cabinet {
             background-color: white;
-            border: 4px solid #333;
+            border: 1px solid #333; /* Outer shell */
             position: relative;
-            box-sizing: border-box; /* Important: border included in dims */
             box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1);
         }
 
@@ -116,226 +125,314 @@
             justify-content: center;
             align-items: center;
             font-size: 0.7rem;
-            color: #555;
-            overflow: hidden;
+            color: #1e3a8a;
+            font-weight: bold;
+            cursor: pointer;
+            transition: transform 0.1s;
         }
-
-        /* Hiding sections */
-        .hidden { display: none; }
         
-        /* Stats */
+        .cell:active { transform: scale(0.98); }
+        .cell.editing { background-color: var(--warning); color: white; border-color: #854d0e; box-shadow: 0 0 0 2px #fde047; z-index: 10;}
+
+        /* Separator Visualization (optional, implicitly shown by gaps) */
+        
+        .hidden { display: none !important; }
+        
         .stats {
-            font-size: 0.8rem;
-            color: #666;
-            margin-top: 5px;
+            font-size: 0.75rem;
+            color: #64748b;
+            margin-top: 10px;
             text-align: center;
+            background: #f1f5f9;
+            padding: 8px;
+            border-radius: 4px;
         }
     </style>
 </head>
 <body>
 
     <div id="step-setup" class="controls">
-        <h2>1. Cabinet Dimensions (cm/mm)</h2>
+        <h2>1. Dimensions & Thickness</h2>
         <div class="input-group">
             <div class="input-wrapper">
-                <label>Total Width</label>
-                <input type="number" id="cab-width" placeholder="e.g. 100" inputmode="numeric">
+                <label>Width</label>
+                <input type="number" id="cab-width" placeholder="mm">
             </div>
             <div class="input-wrapper">
-                <label>Total Height</label>
-                <input type="number" id="cab-height" placeholder="e.g. 200" inputmode="numeric">
+                <label>Height</label>
+                <input type="number" id="cab-height" placeholder="mm">
+            </div>
+            <div class="input-wrapper">
+                <label>Sep. Thick.</label>
+                <input type="number" id="sep-thick" value="30">
             </div>
         </div>
-        <button class="btn-primary" onclick="initCabinet()">Create Cabinet</button>
+        <button class="btn-primary" onclick="initCabinet()">Start Design</button>
     </div>
 
     <div id="step-build" class="controls hidden">
-        <h2>2. Add Cell</h2>
+        <h2 id="action-title">Add New Cell</h2>
+        
         <div class="input-group">
             <div class="input-wrapper">
-                <label>Cell Width</label>
-                <input type="number" id="cell-width" placeholder="W" inputmode="numeric">
+                <label>Width</label>
+                <input type="number" id="cell-width" placeholder="W">
             </div>
             <div class="input-wrapper">
-                <label>Cell Height</label>
-                <input type="number" id="cell-height" placeholder="H" inputmode="numeric">
+                <label>Height</label>
+                <input type="number" id="cell-height" placeholder="H">
             </div>
         </div>
-        <button class="btn-primary" onclick="addCell()">Add Cell</button>
-        <button class="btn-outline" onclick="undoLast()">Undo Last</button>
-        <button class="btn-secondary" onclick="resetApp()">Reset All</button>
+
+        <div id="btns-add" class="btn-group">
+            <button class="btn-primary" onclick="addCell()">Add Cell</button>
+            <button class="btn-success" onclick="fillRow()">Fill Gap</button>
+        </div>
         
-        <div class="stats" id="status-msg">Position: Bottom-Left</div>
+        <div id="btns-edit" class="btn-group hidden">
+            <button class="btn-warning" style="display:block" onclick="saveEdit()">Update Cell</button>
+            <button class="btn-danger" onclick="deleteCell()">Delete</button>
+            <button class="btn-outline" onclick="cancelEdit()">Cancel</button>
+        </div>
+
+        <div class="btn-group" style="margin-top:10px; border-top: 1px solid #e2e8f0; padding-top:10px">
+            <button class="btn-outline" onclick="resetApp()">Reset All</button>
+        </div>
+        
+        <div class="stats" id="status-msg">Ready</div>
     </div>
 
     <div id="drawing-container">
-        <div id="cabinet">
-            </div>
+        <div id="cabinet"></div>
     </div>
 
     <script>
-        // State Variables
-        let cabinetDims = { w: 0, h: 0 };
-        let cells = [];
-        
-        // Cursor to track where the next cell goes
-        let cursor = { x: 0, y: 0 }; 
-        let rowMaxHeight = 0; // Tracks the tallest item in the current row
+        // Data
+        let config = { w: 0, h: 0, thick: 30 };
+        let cells = []; // Array of {id, w, h}
+        let editingId = null;
 
         function initCabinet() {
             const w = parseFloat(document.getElementById('cab-width').value);
             const h = parseFloat(document.getElementById('cab-height').value);
+            const t = parseFloat(document.getElementById('sep-thick').value) || 0;
 
-            if (!w || !h || w <= 0 || h <= 0) {
-                alert("Please enter valid width and height.");
-                return;
-            }
+            if (!w || !h) return alert("Enter valid dimensions");
 
-            cabinetDims = { w, h };
+            config = { w, h, thick: t };
             
-            // Switch UI
             document.getElementById('step-setup').classList.add('hidden');
             document.getElementById('step-build').classList.remove('hidden');
+            render();
+        }
 
-            renderCabinet();
+        function calculateLayout() {
+            // Re-calculate positions for ALL cells from scratch
+            // logic: Bin Packing (Left->Right, then Up)
+            
+            let cursorX = 0;
+            let cursorY = 0;
+            let rowMaxH = 0;
+            let placedCells = [];
+
+            cells.forEach(cell => {
+                let cellX = cursorX;
+                let cellY = cursorY;
+
+                // Check Horizontal fit
+                // If it's not the first item in row, add thickness
+                if (cursorX > 0) cellX += config.thick;
+                
+                // If this cell crosses width boundary
+                if (cellX + cell.w > config.w + 0.1) { // 0.1 float tolerance
+                    // Move to new row
+                    // New Y is previous Y + rowMaxH + thickness
+                    cursorY += (rowMaxH + config.thick);
+                    cursorX = 0; // Reset X
+                    rowMaxH = 0; // Reset max H
+                    
+                    cellX = 0;
+                    cellY = cursorY;
+                }
+
+                // Check Vertical fit
+                if (cellY + cell.h > config.h + 0.1) {
+                    // Item doesn't fit in cabinet
+                    cell.error = true; 
+                } else {
+                    cell.error = false;
+                }
+
+                // Update computed position
+                cell.x = cellX;
+                cell.y = cellY;
+
+                // Update cursors
+                cursorX = cellX + cell.w;
+                if (cell.h > rowMaxH) rowMaxH = cell.h;
+
+                placedCells.push(cell);
+            });
+            
+            return { placedCells, cursorX, cursorY, rowMaxH };
         }
 
         function addCell() {
             const w = parseFloat(document.getElementById('cell-width').value);
             const h = parseFloat(document.getElementById('cell-height').value);
+            if (!w || !h) return;
 
-            if (!w || !h || w <= 0 || h <= 0) {
-                alert("Enter valid cell dimensions.");
-                return;
-            }
-
-            // LOGIC: Left to Right, Bottom to Top
-            
-            // 1. Check if it fits in current row (Width wise)
-            if (cursor.x + w > cabinetDims.w) {
-                // Doesn't fit horizontally. Move to next row.
-                // New Y is current Y + height of the tallest item in the previous row
-                cursor.y += rowMaxHeight;
-                cursor.x = 0; // Reset to left
-                rowMaxHeight = 0; // Reset row height tracker
-            }
-
-            // 2. Check if it fits vertically
-            if (cursor.y + h > cabinetDims.h) {
-                alert("Cabinet is full! Cannot fit this cell vertically.");
-                return;
-            }
-
-            // 3. Add the cell
             cells.push({
+                id: Date.now(),
                 w: w,
-                h: h,
-                x: cursor.x,
-                y: cursor.y
+                h: h
             });
 
-            // 4. Update Cursor for next time
-            cursor.x += w;
-            
-            // Update the max height of the current row if this new cell is taller
-            if (h > rowMaxHeight) {
-                rowMaxHeight = h;
-            }
-
-            // Clear inputs for ease of use
-            document.getElementById('cell-width').value = '';
-            document.getElementById('cell-height').value = '';
-            document.getElementById('cell-width').focus();
-
-            renderCabinet();
-            updateStatus();
+            clearInputs();
+            render();
         }
 
-        function undoLast() {
-            if (cells.length === 0) return;
+        function fillRow() {
+            // Calculate where we are currently
+            const layout = calculateLayout();
+            const currentX = layout.cursorX;
             
-            // Remove last cell
-            cells.pop();
+            // If we are at start of row (currentX == 0), fill whole width
+            // If we are in middle, fill remaining
             
-            // Recalculate positions based on remaining cells
-            // We have to reset and replay because the logic depends on history
-            cursor = { x: 0, y: 0 };
-            rowMaxHeight = 0;
+            let gap = 0;
+            
+            if (currentX === 0) {
+                gap = config.w;
+            } else {
+                // gap is Total Width - Current X - Separator
+                gap = config.w - currentX - config.thick;
+            }
 
-            const existingCells = [...cells];
-            cells = []; // Clear array to rebuild it
+            if (gap <= 0) {
+                alert("No horizontal space left in this row.");
+                return;
+            }
 
-            existingCells.forEach(c => {
-                // Logic repeated from addCell, but without validation since we know they fit
-                if (cursor.x + c.w > cabinetDims.w) {
-                    cursor.y += rowMaxHeight;
-                    cursor.x = 0;
-                    rowMaxHeight = 0;
-                }
-                
-                cells.push({ w: c.w, h: c.h, x: cursor.x, y: cursor.y });
-                
-                cursor.x += c.w;
-                if (c.h > rowMaxHeight) rowMaxHeight = c.h;
+            // Use height from input, or default to max height of current row, or 100 if empty
+            let h = parseFloat(document.getElementById('cell-height').value);
+            if (!h) h = layout.rowMaxH > 0 ? layout.rowMaxH : 100;
+
+            cells.push({
+                id: Date.now(),
+                w: parseFloat(gap.toFixed(1)), // clean decimal
+                h: h
             });
+            
+            render();
+        }
 
-            renderCabinet();
-            updateStatus();
+        // --- Editing Logic ---
+
+        function editCell(id) {
+            const cell = cells.find(c => c.id === id);
+            if (!cell) return;
+
+            editingId = id;
+            
+            // Populate inputs
+            document.getElementById('cell-width').value = cell.w;
+            document.getElementById('cell-height').value = cell.h;
+
+            // Toggle Buttons
+            document.getElementById('btns-add').classList.add('hidden');
+            document.getElementById('btns-edit').classList.remove('hidden');
+            document.getElementById('action-title').innerText = "Edit Cell";
+
+            render(); // Re-render to show selection highlight
+        }
+
+        function saveEdit() {
+            const w = parseFloat(document.getElementById('cell-width').value);
+            const h = parseFloat(document.getElementById('cell-height').value);
+            
+            const index = cells.findIndex(c => c.id === editingId);
+            if (index !== -1) {
+                cells[index].w = w;
+                cells[index].h = h;
+            }
+            
+            cancelEdit(); // Reset UI
+            render();
+        }
+
+        function deleteCell() {
+            cells = cells.filter(c => c.id !== editingId);
+            cancelEdit();
+            render();
+        }
+
+        function cancelEdit() {
+            editingId = null;
+            clearInputs();
+            document.getElementById('btns-add').classList.remove('hidden');
+            document.getElementById('btns-edit').classList.add('hidden');
+            document.getElementById('action-title').innerText = "Add New Cell";
+            render();
+        }
+
+        function clearInputs() {
+            document.getElementById('cell-width').value = '';
+            document.getElementById('cell-height').value = '';
         }
 
         function resetApp() {
-            if(confirm("Start over?")) {
-                location.reload();
-            }
+            if(confirm("Clear all?")) location.reload();
         }
 
-        function updateStatus() {
-            const status = document.getElementById('status-msg');
-            const remainingW = cabinetDims.w - cursor.x;
-            const remainingH = cabinetDims.h - cursor.y;
-            status.innerText = `Current Row Free Width: ${remainingW} | Next Row starts at H: ${cursor.y + rowMaxHeight}`;
-        }
-
-        function renderCabinet() {
+        function render() {
+            const layout = calculateLayout();
             const cabDiv = document.getElementById('cabinet');
             const container = document.getElementById('drawing-container');
-            
-            // Calculate scale to fit screen
-            // We want the cabinet to fill about 90% of the container width
-            const containerWidth = container.offsetWidth - 40; // minus padding
-            const scale = containerWidth / cabinetDims.w;
+            const status = document.getElementById('status-msg');
 
-            // Apply size
-            cabDiv.style.width = (cabinetDims.w * scale) + "px";
-            cabDiv.style.height = (cabinetDims.h * scale) + "px";
-            cabDiv.innerHTML = ''; // Clear current drawing
+            // 1. Scale Cabinet
+            const containerW = container.offsetWidth - 30;
+            const scale = containerW / config.w;
+            cabDiv.style.width = (config.w * scale) + "px";
+            cabDiv.style.height = (config.h * scale) + "px";
+            cabDiv.innerHTML = '';
 
-            // Draw Cells
-            cells.forEach((cell, index) => {
-                const cellDiv = document.createElement('div');
-                cellDiv.className = 'cell';
-                
-                // Dimensions in Percentage creates perfect scaling
-                cellDiv.style.width = (cell.w / cabinetDims.w * 100) + "%";
-                cellDiv.style.height = (cell.h / cabinetDims.h * 100) + "%";
-                
-                // Position (Left / Bottom)
-                // Note: HTML coordinates usually start Top-Left. 
-                // To simulate Bottom-Up build, we use bottom CSS property.
-                cellDiv.style.left = (cell.x / cabinetDims.w * 100) + "%";
-                cellDiv.style.bottom = (cell.y / cabinetDims.h * 100) + "%";
+            // 2. Draw Cells
+            layout.placedCells.forEach(cell => {
+                if (cell.error) return; // Don't draw if it doesn't fit
 
-                cellDiv.innerText = `${cell.w}x${cell.h}`;
+                const div = document.createElement('div');
+                div.className = 'cell';
+                if (cell.id === editingId) div.classList.add('editing');
+
+                div.style.width = (cell.w * scale) + "px";
+                div.style.height = (cell.h * scale) + "px";
                 
-                cabDiv.appendChild(cellDiv);
+                // Position (Bottom-Left origin simulation)
+                div.style.left = (cell.x * scale) + "px";
+                div.style.bottom = (cell.y * scale) + "px";
+
+                div.innerHTML = `${Math.round(cell.w)}<br><small>${Math.round(cell.h)}</small>`;
+                div.onclick = () => editCell(cell.id);
+
+                cabDiv.appendChild(div);
             });
+
+            // 3. Update Status
+            const remainingW = config.w - layout.cursorX;
+            let msg = "";
+            if (remainingW > config.thick) {
+                msg = `Row Space: ${Math.round(remainingW - config.thick)}mm`;
+            } else {
+                msg = "Row Full. Next cell starts new row.";
+            }
+            status.innerText = msg;
         }
 
-        // Handle window resize
         window.addEventListener('resize', () => {
-            if(cabinetDims.w > 0) renderCabinet();
+             if(config.w > 0) render();
         });
-
     </script>
 </body>
 </html>
