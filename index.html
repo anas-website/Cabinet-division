@@ -1,0 +1,341 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Cabinet Divider App</title>
+    <style>
+        :root {
+            --primary: #2563eb;
+            --bg: #f8fafc;
+            --surface: #ffffff;
+            --border: #cbd5e1;
+            --cell-bg: #e2e8f0;
+            --cell-border: #64748b;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+            background-color: var(--bg);
+            margin: 0;
+            padding: 20px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            color: #333;
+        }
+
+        h2 { margin-top: 0; font-size: 1.2rem; }
+
+        /* Controls Container */
+        .controls {
+            background: var(--surface);
+            padding: 15px;
+            border-radius: 12px;
+            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
+            width: 100%;
+            max-width: 400px;
+            box-sizing: border-box;
+            margin-bottom: 20px;
+        }
+
+        .input-group {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 15px;
+        }
+
+        .input-wrapper {
+            flex: 1;
+        }
+
+        label {
+            display: block;
+            font-size: 0.8rem;
+            color: #666;
+            margin-bottom: 4px;
+        }
+
+        input[type="number"] {
+            width: 100%;
+            padding: 10px;
+            border: 1px solid var(--border);
+            border-radius: 6px;
+            font-size: 1rem;
+            box-sizing: border-box;
+            -moz-appearance: textfield; /* Remove arrows */
+        }
+
+        button {
+            width: 100%;
+            padding: 12px;
+            border: none;
+            border-radius: 6px;
+            font-size: 1rem;
+            font-weight: 600;
+            cursor: pointer;
+            transition: opacity 0.2s;
+        }
+
+        button:active { opacity: 0.8; }
+
+        .btn-primary { background-color: var(--primary); color: white; }
+        .btn-secondary { background-color: #ef4444; color: white; margin-top: 10px;}
+        .btn-outline { background-color: transparent; border: 1px solid var(--primary); color: var(--primary); margin-top: 10px;}
+
+        /* The Cabinet Drawing Area */
+        #drawing-container {
+            width: 100%;
+            max-width: 400px;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            /* Reserve space */
+            min-height: 300px; 
+            background-color: #e5e5e5;
+            border-radius: 8px;
+            padding: 20px;
+            box-sizing: border-box;
+            overflow: hidden;
+        }
+
+        #cabinet {
+            background-color: white;
+            border: 4px solid #333;
+            position: relative;
+            box-sizing: border-box; /* Important: border included in dims */
+            box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1);
+        }
+
+        .cell {
+            position: absolute;
+            background-color: var(--cell-bg);
+            border: 1px solid var(--cell-border);
+            box-sizing: border-box;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            font-size: 0.7rem;
+            color: #555;
+            overflow: hidden;
+        }
+
+        /* Hiding sections */
+        .hidden { display: none; }
+        
+        /* Stats */
+        .stats {
+            font-size: 0.8rem;
+            color: #666;
+            margin-top: 5px;
+            text-align: center;
+        }
+    </style>
+</head>
+<body>
+
+    <div id="step-setup" class="controls">
+        <h2>1. Cabinet Dimensions (cm/mm)</h2>
+        <div class="input-group">
+            <div class="input-wrapper">
+                <label>Total Width</label>
+                <input type="number" id="cab-width" placeholder="e.g. 100" inputmode="numeric">
+            </div>
+            <div class="input-wrapper">
+                <label>Total Height</label>
+                <input type="number" id="cab-height" placeholder="e.g. 200" inputmode="numeric">
+            </div>
+        </div>
+        <button class="btn-primary" onclick="initCabinet()">Create Cabinet</button>
+    </div>
+
+    <div id="step-build" class="controls hidden">
+        <h2>2. Add Cell</h2>
+        <div class="input-group">
+            <div class="input-wrapper">
+                <label>Cell Width</label>
+                <input type="number" id="cell-width" placeholder="W" inputmode="numeric">
+            </div>
+            <div class="input-wrapper">
+                <label>Cell Height</label>
+                <input type="number" id="cell-height" placeholder="H" inputmode="numeric">
+            </div>
+        </div>
+        <button class="btn-primary" onclick="addCell()">Add Cell</button>
+        <button class="btn-outline" onclick="undoLast()">Undo Last</button>
+        <button class="btn-secondary" onclick="resetApp()">Reset All</button>
+        
+        <div class="stats" id="status-msg">Position: Bottom-Left</div>
+    </div>
+
+    <div id="drawing-container">
+        <div id="cabinet">
+            </div>
+    </div>
+
+    <script>
+        // State Variables
+        let cabinetDims = { w: 0, h: 0 };
+        let cells = [];
+        
+        // Cursor to track where the next cell goes
+        let cursor = { x: 0, y: 0 }; 
+        let rowMaxHeight = 0; // Tracks the tallest item in the current row
+
+        function initCabinet() {
+            const w = parseFloat(document.getElementById('cab-width').value);
+            const h = parseFloat(document.getElementById('cab-height').value);
+
+            if (!w || !h || w <= 0 || h <= 0) {
+                alert("Please enter valid width and height.");
+                return;
+            }
+
+            cabinetDims = { w, h };
+            
+            // Switch UI
+            document.getElementById('step-setup').classList.add('hidden');
+            document.getElementById('step-build').classList.remove('hidden');
+
+            renderCabinet();
+        }
+
+        function addCell() {
+            const w = parseFloat(document.getElementById('cell-width').value);
+            const h = parseFloat(document.getElementById('cell-height').value);
+
+            if (!w || !h || w <= 0 || h <= 0) {
+                alert("Enter valid cell dimensions.");
+                return;
+            }
+
+            // LOGIC: Left to Right, Bottom to Top
+            
+            // 1. Check if it fits in current row (Width wise)
+            if (cursor.x + w > cabinetDims.w) {
+                // Doesn't fit horizontally. Move to next row.
+                // New Y is current Y + height of the tallest item in the previous row
+                cursor.y += rowMaxHeight;
+                cursor.x = 0; // Reset to left
+                rowMaxHeight = 0; // Reset row height tracker
+            }
+
+            // 2. Check if it fits vertically
+            if (cursor.y + h > cabinetDims.h) {
+                alert("Cabinet is full! Cannot fit this cell vertically.");
+                return;
+            }
+
+            // 3. Add the cell
+            cells.push({
+                w: w,
+                h: h,
+                x: cursor.x,
+                y: cursor.y
+            });
+
+            // 4. Update Cursor for next time
+            cursor.x += w;
+            
+            // Update the max height of the current row if this new cell is taller
+            if (h > rowMaxHeight) {
+                rowMaxHeight = h;
+            }
+
+            // Clear inputs for ease of use
+            document.getElementById('cell-width').value = '';
+            document.getElementById('cell-height').value = '';
+            document.getElementById('cell-width').focus();
+
+            renderCabinet();
+            updateStatus();
+        }
+
+        function undoLast() {
+            if (cells.length === 0) return;
+            
+            // Remove last cell
+            cells.pop();
+            
+            // Recalculate positions based on remaining cells
+            // We have to reset and replay because the logic depends on history
+            cursor = { x: 0, y: 0 };
+            rowMaxHeight = 0;
+
+            const existingCells = [...cells];
+            cells = []; // Clear array to rebuild it
+
+            existingCells.forEach(c => {
+                // Logic repeated from addCell, but without validation since we know they fit
+                if (cursor.x + c.w > cabinetDims.w) {
+                    cursor.y += rowMaxHeight;
+                    cursor.x = 0;
+                    rowMaxHeight = 0;
+                }
+                
+                cells.push({ w: c.w, h: c.h, x: cursor.x, y: cursor.y });
+                
+                cursor.x += c.w;
+                if (c.h > rowMaxHeight) rowMaxHeight = c.h;
+            });
+
+            renderCabinet();
+            updateStatus();
+        }
+
+        function resetApp() {
+            if(confirm("Start over?")) {
+                location.reload();
+            }
+        }
+
+        function updateStatus() {
+            const status = document.getElementById('status-msg');
+            const remainingW = cabinetDims.w - cursor.x;
+            const remainingH = cabinetDims.h - cursor.y;
+            status.innerText = `Current Row Free Width: ${remainingW} | Next Row starts at H: ${cursor.y + rowMaxHeight}`;
+        }
+
+        function renderCabinet() {
+            const cabDiv = document.getElementById('cabinet');
+            const container = document.getElementById('drawing-container');
+            
+            // Calculate scale to fit screen
+            // We want the cabinet to fill about 90% of the container width
+            const containerWidth = container.offsetWidth - 40; // minus padding
+            const scale = containerWidth / cabinetDims.w;
+
+            // Apply size
+            cabDiv.style.width = (cabinetDims.w * scale) + "px";
+            cabDiv.style.height = (cabinetDims.h * scale) + "px";
+            cabDiv.innerHTML = ''; // Clear current drawing
+
+            // Draw Cells
+            cells.forEach((cell, index) => {
+                const cellDiv = document.createElement('div');
+                cellDiv.className = 'cell';
+                
+                // Dimensions in Percentage creates perfect scaling
+                cellDiv.style.width = (cell.w / cabinetDims.w * 100) + "%";
+                cellDiv.style.height = (cell.h / cabinetDims.h * 100) + "%";
+                
+                // Position (Left / Bottom)
+                // Note: HTML coordinates usually start Top-Left. 
+                // To simulate Bottom-Up build, we use bottom CSS property.
+                cellDiv.style.left = (cell.x / cabinetDims.w * 100) + "%";
+                cellDiv.style.bottom = (cell.y / cabinetDims.h * 100) + "%";
+
+                cellDiv.innerText = `${cell.w}x${cell.h}`;
+                
+                cabDiv.appendChild(cellDiv);
+            });
+        }
+
+        // Handle window resize
+        window.addEventListener('resize', () => {
+            if(cabinetDims.w > 0) renderCabinet();
+        });
+
+    </script>
+</body>
+</html>
