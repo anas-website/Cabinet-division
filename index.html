@@ -3,457 +3,483 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Cabinet Subdivider</title>
+    <title>Cabinet Master: Split & Merge</title>
     <style>
         :root {
             --primary: #2563eb;
-            --accent: #f59e0b;
+            --success: #16a34a;
+            --danger: #dc2626;
             --bg: #f1f5f9;
             --surface: #ffffff;
             --border: #cbd5e1;
-            --cell-bg: #e0f2fe;
-            --cell-hover: #bae6fd;
-            --separator: #334155;
+            --cell-bg: #dbeafe;
+            --cell-border: #3b82f6;
+            --cell-active: #2563eb;
+            --highlight: #facc15;
         }
 
         body {
-            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
             background-color: var(--bg);
             margin: 0;
-            padding: 20px;
+            padding: 15px;
             display: flex;
             flex-direction: column;
             align-items: center;
-            height: 100vh;
+            padding-bottom: 100px;
+        }
+
+        /* Controls Container */
+        .controls {
+            background: var(--surface);
+            padding: 15px;
+            border-radius: 16px;
+            box-shadow: 0 4px 10px rgba(0,0,0,0.05);
+            width: 100%;
+            max-width: 420px;
+            margin-bottom: 20px;
             box-sizing: border-box;
         }
 
-        /* --- UI Controls --- */
-        .panel {
-            background: var(--surface);
-            padding: 15px;
-            border-radius: 12px;
-            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
-            width: 100%;
-            max-width: 450px;
-            margin-bottom: 15px;
-            z-index: 10;
-        }
+        h2 { margin: 0 0 10px 0; font-size: 1rem; color: #334155; border-bottom: 1px solid #e2e8f0; padding-bottom: 8px;}
+        h3 { margin: 10px 0 5px 0; font-size: 0.85rem; color: #64748b; text-transform: uppercase; letter-spacing: 0.5px;}
 
-        .row {
-            display: flex;
-            gap: 10px;
-            align-items: center;
-        }
-
-        .col {
-            flex: 1;
-            display: flex;
-            flex-direction: column;
-        }
-
-        label {
-            font-size: 0.75rem;
-            color: #64748b;
-            margin-bottom: 4px;
-            font-weight: 600;
-        }
-
-        input {
+        .input-row { display: flex; gap: 10px; margin-bottom: 10px; }
+        .input-wrap { flex: 1; }
+        
+        label { display: block; font-size: 0.7rem; color: #64748b; margin-bottom: 4px; font-weight: 600;}
+        
+        input[type="number"] {
             width: 100%;
             padding: 10px;
             border: 1px solid var(--border);
-            border-radius: 6px;
+            border-radius: 8px;
             font-size: 1rem;
             box-sizing: border-box;
             background: #f8fafc;
         }
+        input:focus { outline: 2px solid var(--primary); background: #fff; }
+
+        /* Buttons */
+        .btn-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+        .btn-full { width: 100%; margin-top: 8px;}
 
         button {
             padding: 12px;
             border: none;
-            border-radius: 6px;
+            border-radius: 8px;
+            font-size: 0.9rem;
             font-weight: 600;
             cursor: pointer;
-            font-size: 0.9rem;
             transition: all 0.2s;
-        }
-
-        .btn-primary { background: var(--primary); color: white; width: 100%; }
-        .btn-danger { background: #ef4444; color: white; }
-        .btn-ghost { background: transparent; border: 1px solid var(--border); color: #64748b; }
-
-        /* Split Controls (Hidden until needed) */
-        #split-controls {
-            border-top: 1px solid var(--border);
-            margin-top: 10px;
-            padding-top: 10px;
-        }
-        
-        .split-options {
             display: flex;
-            gap: 8px;
-            margin-bottom: 10px;
+            align-items: center;
+            justify-content: center;
+            gap: 5px;
         }
 
-        .hidden { display: none !important; }
+        .btn-primary { background: var(--primary); color: white; }
+        .btn-success { background: var(--success); color: white; }
+        .btn-danger { background: var(--danger); color: white; }
+        .btn-neutral { background: #e2e8f0; color: #475569; }
+        .btn-active { background: var(--highlight); color: #854d0e; border: 1px solid #eab308; }
 
-        /* --- The Drawing Area --- */
-        #viewport {
-            flex: 1;
+        button:disabled { opacity: 0.5; cursor: not-allowed; }
+
+        /* Drawing Area */
+        #drawing-container {
             width: 100%;
+            max-width: 420px;
+            background: #e2e8f0;
+            border-radius: 12px;
+            padding: 20px;
+            box-sizing: border-box;
+            min-height: 300px;
             display: flex;
             justify-content: center;
-            align-items: flex-start; /* Align top */
-            overflow: auto;
-            position: relative;
+            align-items: center;
+            overflow: hidden;
         }
 
         #cabinet {
-            background-color: white;
-            border: 2px solid #0f172a;
+            background: white;
+            border: 2px solid #334155;
             position: relative;
-            box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.1);
-            transition: width 0.3s, height 0.3s;
+            box-shadow: 0 10px 20px rgba(0,0,0,0.1);
         }
 
-        /* The Empty Space (Cell) */
         .cell {
             position: absolute;
-            background-color: var(--cell-bg);
-            border: 1px dashed #94a3b8; /* Dashed helps see empty zones */
+            background: var(--cell-bg);
+            border: 1px solid var(--cell-border);
             box-sizing: border-box;
-            cursor: pointer;
             display: flex;
             flex-direction: column;
             justify-content: center;
             align-items: center;
-            color: #0369a1;
             font-size: 0.75rem;
-            user-select: none;
+            color: #1e40af;
+            font-weight: bold;
+            cursor: pointer;
+            overflow: hidden;
+            transition: transform 0.1s;
         }
-
-        .cell:hover { background-color: var(--cell-hover); }
 
         .cell.selected {
-            background-color: var(--accent); /* Orange/Yellow highlight */
-            color: white;
-            border: 2px solid #b45309;
-            z-index: 5;
+            background: var(--highlight);
+            color: #713f12;
+            border: 2px solid #a16207;
+            z-index: 10;
+            box-shadow: 0 0 0 3px rgba(250, 204, 21, 0.4);
         }
 
-        /* The Separator (The wall) */
-        .separator {
-            position: absolute;
-            background-color: var(--separator);
-            z-index: 2;
+        /* Tool Panels */
+        .hidden { display: none !important; }
+        
+        .tool-panel {
+            background: #f8fafc;
+            border: 1px solid #e2e8f0;
+            padding: 10px;
+            border-radius: 8px;
+            margin-top: 10px;
         }
 
-        .dim-text { pointer-events: none; }
+        .separator-hint {
+            font-size: 0.7rem;
+            color: #94a3b8;
+            text-align: center;
+            margin-top: 5px;
+        }
+
     </style>
 </head>
 <body>
 
-    <div id="setup-panel" class="panel">
-        <div class="row">
-            <div class="col">
-                <label>Total Width</label>
-                <input type="number" id="cab-w" value="1000">
+    <div id="setup-panel" class="controls">
+        <h2>1. Cabinet Settings (mm)</h2>
+        <div class="input-row">
+            <div class="input-wrap">
+                <label>Width</label>
+                <input type="number" id="cab-width" value="1000">
             </div>
-            <div class="col">
-                <label>Total Height</label>
-                <input type="number" id="cab-h" value="2000">
+            <div class="input-wrap">
+                <label>Height</label>
+                <input type="number" id="cab-height" value="2000">
             </div>
-            <div class="col">
-                <label>Sep. Thick.</label>
-                <input type="number" id="sep-t" value="30">
+            <div class="input-wrap">
+                <label>Barrier Thick.</label>
+                <input type="number" id="sep-thick" value="18">
             </div>
         </div>
-        <div class="row" style="margin-top: 10px;">
-            <button class="btn-primary" onclick="initCabinet()">Create Cabinet</button>
-        </div>
+        <button class="btn-primary btn-full" onclick="initApp()">Create Cabinet</button>
     </div>
 
-    <div id="edit-panel" class="panel hidden">
-        <div class="row" style="justify-content: space-between; margin-bottom: 10px;">
-            <strong style="font-size: 0.9rem;">Selected Space: <span id="sel-dims"></span></strong>
-            <button class="btn-ghost" style="padding: 5px 10px;" onclick="deselect()">Cancel</button>
-        </div>
-
-        <div class="split-options">
-            <button class="col btn-ghost" onclick="setSplitMode('vertical')" id="btn-mode-v">|| Vertical Split</button>
-            <button class="col btn-ghost" onclick="setSplitMode('horizontal')" id="btn-mode-h">= Horizontal Split</button>
-        </div>
-
-        <div id="split-inputs" class="hidden">
-            <div class="row">
-                <div class="col">
-                    <label id="lbl-offset">Distance from Left</label>
-                    <input type="number" id="split-offset" placeholder="Enter size">
+    <div id="main-panel" class="controls hidden">
+        <h2>Cabinet Tools</h2>
+        
+        <div id="add-mode">
+            <div class="input-row">
+                <div class="input-wrap">
+                    <label>New Width</label>
+                    <input type="number" id="new-w" placeholder="Auto">
                 </div>
-                <div class="col" style="flex: 0.5; justify-content: flex-end;">
-                    <button class="btn-primary" onclick="applySplit()">Cut</button>
+                <div class="input-wrap">
+                    <label>New Height</label>
+                    <input type="number" id="new-h" placeholder="Auto">
                 </div>
             </div>
-            <div style="margin-top:5px; font-size: 0.7rem; color: #666;">
-                Remaining space will be auto-calculated minus separator thickness.
+            <div class="btn-grid">
+                <button class="btn-primary" onclick="addCell()">+ Add Cell</button>
+                <button class="btn-success" onclick="fillRow()">Fill Row</button>
             </div>
         </div>
-    </div>
-    
-    <div style="width: 100%; max-width: 450px; display: flex; justify-content: flex-end; margin-bottom: 5px;">
-        <button class="btn-ghost" style="font-size: 0.8rem; padding: 5px;" onclick="undo()">Undo Last</button>
+
+        <div id="edit-mode" class="tool-panel hidden">
+            <h3>Selected Cell Actions</h3>
+            
+            <div class="input-row">
+                <div class="input-wrap">
+                    <label>Width</label>
+                    <input type="number" id="edit-w">
+                </div>
+                <div class="input-wrap">
+                    <label>Height</label>
+                    <input type="number" id="edit-h">
+                </div>
+                <button class="btn-neutral" onclick="updateCellDims()">Update</button>
+            </div>
+
+            <div style="margin-top:15px; border-top:1px solid #cbd5e1; padding-top:10px;">
+                <label>Divide Equally</label>
+                <div class="input-row">
+                    <input type="number" id="split-count" value="2" min="2" style="width:60px">
+                    <button class="btn-primary" style="flex:1" onclick="splitCell()">Divide into Parts</button>
+                </div>
+                <div class="separator-hint">Calculates math & subtracts barriers automatically</div>
+            </div>
+
+            <div style="margin-top:15px; border-top:1px solid #cbd5e1; padding-top:10px;">
+                <label>Remove Barriers</label>
+                <div class="btn-grid">
+                    <button class="btn-active" onclick="mergeRight()">Remove Right Barrier</button>
+                    <button class="btn-danger" onclick="deleteCell()">Delete Cell</button>
+                </div>
+                <div class="separator-hint" style="text-align: left; margin-top:5px;">"Remove Right Barrier" merges this cell with the neighbor to the right.</div>
+            </div>
+
+            <button class="btn-neutral btn-full" style="margin-top:10px" onclick="deselect()">Cancel Selection</button>
+        </div>
+
+        <button class="btn-neutral btn-full" style="margin-top:15px" onclick="resetAll()">Reset All</button>
     </div>
 
-    <div id="viewport">
-        <div id="cabinet">
-            </div>
+    <div id="drawing-container">
+        <div id="cabinet"></div>
     </div>
 
     <script>
         // State
-        let config = { w: 1000, h: 2000, thick: 30 };
-        
-        // We store "Rectangles". Start with one big rectangle.
-        // Type: 'space' (clickable) or 'separator' (static block)
-        let items = []; 
-        let historyStack = [];
-
+        let config = { w: 1000, h: 2000, thick: 18 };
+        let cells = []; 
         let selectedId = null;
-        let splitMode = null; // 'vertical' or 'horizontal'
 
-        function initCabinet() {
-            const w = parseFloat(document.getElementById('cab-w').value);
-            const h = parseFloat(document.getElementById('cab-h').value);
-            const t = parseFloat(document.getElementById('sep-t').value);
+        // --- Initialization ---
+        function initApp() {
+            const w = parseFloat(document.getElementById('cab-width').value);
+            const h = parseFloat(document.getElementById('cab-height').value);
+            const t = parseFloat(document.getElementById('sep-thick').value);
 
-            if (!w || !h) return alert("Invalid dimensions");
+            if(!w || !h) return alert("Invalid Dimensions");
 
             config = { w, h, thick: t };
             
-            // Reset items: One giant empty space
-            items = [{
-                id: Date.now(),
-                type: 'space',
-                x: 0, y: 0,
-                w: w, h: h
-            }];
-            
-            saveHistory(); // Initial state
-            render();
-            
-            // Hide setup, show canvas
             document.getElementById('setup-panel').classList.add('hidden');
+            document.getElementById('main-panel').classList.remove('hidden');
+            
+            render();
         }
 
-        // --- Selection Logic ---
+        // --- Core Logic (Layout Engine) ---
+        function calculateLayout() {
+            let cursorX = 0;
+            let cursorY = 0;
+            let rowMaxH = 0;
+            let computedCells = [];
+
+            cells.forEach((cell, index) => {
+                let x = cursorX;
+                let y = cursorY;
+
+                // Add thickness if not first in row
+                if (cursorX > 0) x += config.thick;
+
+                // Check Wrap
+                if (x + cell.w > config.w + 0.5) { // Tolerance
+                    y += (rowMaxH + config.thick);
+                    x = 0;
+                    rowMaxH = 0;
+                }
+
+                // Update Layout Data
+                const computed = { 
+                    ...cell, 
+                    x: x, 
+                    y: y, 
+                    rowH: 0 // Will fill later if needed
+                };
+                
+                computedCells.push(computed);
+
+                // Advance Cursor
+                cursorX = x + cell.w;
+                if (cell.h > rowMaxH) rowMaxH = cell.h;
+            });
+
+            return { computedCells, cursorX, cursorY, rowMaxH };
+        }
+
+        // --- Actions ---
+
+        function addCell() {
+            let w = parseFloat(document.getElementById('new-w').value);
+            let h = parseFloat(document.getElementById('new-h').value);
+            
+            // Auto defaults
+            if (!h) h = 300; 
+            if (!w) w = 300;
+
+            cells.push({ id: Date.now(), w: w, h: h });
+            render();
+            
+            // Clear inputs
+            document.getElementById('new-w').value = '';
+        }
+
+        function fillRow() {
+            const layout = calculateLayout();
+            const currentX = layout.cursorX;
+            
+            let gap = 0;
+            if (currentX === 0) gap = config.w;
+            else gap = config.w - currentX - config.thick;
+
+            if (gap < 1) return alert("Row is full!");
+
+            let h = parseFloat(document.getElementById('new-h').value);
+            if (!h) h = layout.rowMaxH > 0 ? layout.rowMaxH : 300;
+
+            cells.push({ id: Date.now(), w: gap, h: h });
+            render();
+        }
+
+        // --- Selection & Editing ---
 
         function selectCell(id) {
             selectedId = id;
-            splitMode = null; // Reset mode
-            
-            const cell = items.find(i => i.id === id);
+            const cell = cells.find(c => c.id === id);
             
             // Show Edit Panel
-            document.getElementById('edit-panel').classList.remove('hidden');
-            document.getElementById('sel-dims').innerText = `${Math.round(cell.w)} x ${Math.round(cell.h)}`;
-            
-            // Reset Inputs
-            document.getElementById('split-inputs').classList.add('hidden');
-            document.getElementById('btn-mode-v').style.background = 'transparent';
-            document.getElementById('btn-mode-h').style.background = 'transparent';
-            document.getElementById('btn-mode-v').style.color = '#64748b';
-            document.getElementById('btn-mode-h').style.color = '#64748b';
+            document.getElementById('add-mode').classList.add('hidden');
+            document.getElementById('edit-mode').classList.remove('hidden');
 
-            render(); // To highlight selection
+            // Populate Values
+            document.getElementById('edit-w').value = parseFloat(cell.w.toFixed(1));
+            document.getElementById('edit-h').value = parseFloat(cell.h.toFixed(1));
+
+            render();
         }
 
         function deselect() {
             selectedId = null;
-            document.getElementById('edit-panel').classList.add('hidden');
+            document.getElementById('add-mode').classList.remove('hidden');
+            document.getElementById('edit-mode').classList.add('hidden');
             render();
         }
 
-        function setSplitMode(mode) {
-            splitMode = mode;
-            document.getElementById('split-inputs').classList.remove('hidden');
+        function updateCellDims() {
+            const w = parseFloat(document.getElementById('edit-w').value);
+            const h = parseFloat(document.getElementById('edit-h').value);
             
-            const lbl = document.getElementById('lbl-offset');
-            const cell = items.find(i => i.id === selectedId);
-
-            // Update UI styles for active button
-            const btnV = document.getElementById('btn-mode-v');
-            const btnH = document.getElementById('btn-mode-h');
-            
-            if(mode === 'vertical') {
-                lbl.innerText = `Left Width (Max ${Math.round(cell.w - config.thick)})`;
-                btnV.style.background = '#e0f2fe'; btnV.style.color = '#0284c7';
-                btnH.style.background = 'transparent'; btnH.style.color = '#64748b';
-            } else {
-                lbl.innerText = `Bottom Height (Max ${Math.round(cell.h - config.thick)})`;
-                btnH.style.background = '#e0f2fe'; btnH.style.color = '#0284c7';
-                btnV.style.background = 'transparent'; btnV.style.color = '#64748b';
+            const idx = cells.findIndex(c => c.id === selectedId);
+            if (idx > -1) {
+                cells[idx].w = w;
+                cells[idx].h = h;
             }
-            
-            document.getElementById('split-offset').value = '';
-            document.getElementById('split-offset').focus();
+            render();
         }
 
-        // --- Splitting Logic ---
-
-        function applySplit() {
-            if (!selectedId || !splitMode) return;
-
-            const offset = parseFloat(document.getElementById('split-offset').value);
-            const cellIndex = items.findIndex(i => i.id === selectedId);
-            const cell = items[cellIndex];
-
-            if (!offset || offset <= 0) return alert("Enter a valid size");
-
-            // Validation
-            const maxLimit = (splitMode === 'vertical' ? cell.w : cell.h) - config.thick;
-            if (offset >= maxLimit) {
-                alert(`Too big! Must be less than ${Math.round(maxLimit)} to leave room for separator.`);
-                return;
-            }
-
-            saveHistory(); // Save before modifying
-
-            // Remove old cell
-            items.splice(cellIndex, 1);
-
-            // Create 3 new items: Cell 1, Separator, Cell 2
-            
-            if (splitMode === 'vertical') {
-                // 1. Left Cell
-                items.push({
-                    id: Date.now() + 1,
-                    type: 'space',
-                    x: cell.x,
-                    y: cell.y,
-                    w: offset,
-                    h: cell.h
-                });
-
-                // 2. Separator
-                items.push({
-                    id: Date.now() + 2,
-                    type: 'separator',
-                    x: cell.x + offset,
-                    y: cell.y,
-                    w: config.thick,
-                    h: cell.h
-                });
-
-                // 3. Right Cell
-                items.push({
-                    id: Date.now() + 3,
-                    type: 'space',
-                    x: cell.x + offset + config.thick,
-                    y: cell.y,
-                    w: cell.w - offset - config.thick,
-                    h: cell.h
-                });
-
-            } else {
-                // Horizontal (Bottom to Top logic)
-                // Note: We are using "Bottom" CSS positioning, so Y increases upwards visually if we mapped it directly,
-                // BUT in this data structure, let's treat Y=0 as Bottom.
-
-                // 1. Bottom Cell
-                items.push({
-                    id: Date.now() + 1,
-                    type: 'space',
-                    x: cell.x,
-                    y: cell.y,
-                    w: cell.w,
-                    h: offset
-                });
-
-                // 2. Separator
-                items.push({
-                    id: Date.now() + 2,
-                    type: 'separator',
-                    x: cell.x,
-                    y: cell.y + offset,
-                    w: cell.w,
-                    h: config.thick
-                });
-
-                // 3. Top Cell
-                items.push({
-                    id: Date.now() + 3,
-                    type: 'space',
-                    x: cell.x,
-                    y: cell.y + offset + config.thick,
-                    w: cell.w,
-                    h: cell.h - offset - config.thick
-                });
-            }
-
-            deselect(); // Close panel and redraw
-        }
-
-        // --- Core Functions ---
-
-        function saveHistory() {
-            // Deep copy items
-            historyStack.push(JSON.stringify(items));
-            if (historyStack.length > 10) historyStack.shift(); // Limit history
-        }
-
-        function undo() {
-            if (historyStack.length === 0) return;
-            items = JSON.parse(historyStack.pop());
+        function deleteCell() {
+            cells = cells.filter(c => c.id !== selectedId);
             deselect();
+        }
+
+        // --- COMPLEX ACTIONS: Split & Merge ---
+
+        function splitCell() {
+            const parts = parseInt(document.getElementById('split-count').value);
+            if (parts < 2) return;
+
+            const idx = cells.findIndex(c => c.id === selectedId);
+            if (idx === -1) return;
+
+            const original = cells[idx];
+            
+            // MATH: (TotalWidth - (Separators * Thickness)) / Parts
+            const totalSeparators = (parts - 1) * config.thick;
+            const newWidth = (original.w - totalSeparators) / parts;
+
+            if (newWidth <= 0) return alert("Barrier too thick for this cell size!");
+
+            // Create new cells
+            const newCells = [];
+            for(let i=0; i<parts; i++) {
+                newCells.push({
+                    id: Date.now() + i,
+                    w: newWidth,
+                    h: original.h
+                });
+            }
+
+            // Replace original cell with new cells in the array
+            // splice(start, deleteCount, item1, item2...)
+            cells.splice(idx, 1, ...newCells);
+
+            deselect();
+        }
+
+        function mergeRight() {
+            const idx = cells.findIndex(c => c.id === selectedId);
+            if (idx === -1 || idx === cells.length - 1) return alert("No cell to the right to merge with.");
+
+            const current = cells[idx];
+            const next = cells[idx+1];
+
+            // Validate logic: Are they on the same row?
+            // We do a quick check by position (simplistic but works for this linear flow)
+            // A robust way is to check the layout calculation, but for this use case:
+            // Just merge the math.
+            
+            const newWidth = current.w + next.w + config.thick;
+            
+            // Create merged cell
+            const merged = {
+                id: current.id,
+                w: newWidth,
+                h: Math.max(current.h, next.h) // Take tallest
+            };
+
+            // Remove both, insert merged
+            cells.splice(idx, 2, merged);
+            
+            // Update selection to the new merged cell
+            selectCell(merged.id); 
             render();
+        }
+
+        // --- Rendering ---
+        function resetAll() {
+            if(confirm("Reset everything?")) location.reload();
         }
 
         function render() {
+            const layout = calculateLayout();
             const cabDiv = document.getElementById('cabinet');
-            const viewport = document.getElementById('viewport');
+            const container = document.getElementById('drawing-container');
 
-            // 1. Calculate Scale to fit screen
-            // viewport width - padding
-            const availW = viewport.offsetWidth - 20; 
-            const scale = availW / config.w;
+            // Scale Logic
+            const margin = 40;
+            const containerW = container.offsetWidth - margin;
+            const scale = containerW / config.w;
 
             cabDiv.style.width = (config.w * scale) + "px";
             cabDiv.style.height = (config.h * scale) + "px";
             cabDiv.innerHTML = '';
 
-            // 2. Draw Items
-            items.forEach(item => {
+            layout.computedCells.forEach(cell => {
                 const div = document.createElement('div');
-                
-                // Position & Size
-                div.style.left = (item.x * scale) + "px";
-                div.style.bottom = (item.y * scale) + "px"; // Drawing from bottom-up
-                div.style.width = (item.w * scale) + "px";
-                div.style.height = (item.h * scale) + "px";
+                div.className = 'cell';
+                if(cell.id === selectedId) div.classList.add('selected');
 
-                if (item.type === 'separator') {
-                    div.className = 'separator';
-                } else {
-                    div.className = 'cell';
-                    if (item.id === selectedId) div.classList.add('selected');
-                    
-                    // Text
-                    div.innerHTML = `<span class="dim-text">${Math.round(item.w)}</span>
-                                     <span class="dim-text" style="font-size:0.6rem; opacity:0.7">x</span>
-                                     <span class="dim-text">${Math.round(item.h)}</span>`;
-                    
-                    // Event
-                    div.onclick = () => selectCell(item.id);
-                }
+                div.style.width = (cell.w * scale) + "px";
+                div.style.height = (cell.h * scale) + "px";
+                div.style.left = (cell.x * scale) + "px";
+                div.style.bottom = (cell.y * scale) + "px";
+
+                div.innerHTML = `<span>${Math.round(cell.w)}</span><span style="font-size:0.6em; color:#64748b">${Math.round(cell.h)}</span>`;
+                
+                div.onclick = (e) => {
+                    e.stopPropagation();
+                    selectCell(cell.id);
+                };
 
                 cabDiv.appendChild(div);
             });
         }
 
-        window.addEventListener('resize', () => {
-             if(config.w) render();
-        });
+        window.addEventListener('resize', () => { if(config.w) render(); });
+        document.getElementById('drawing-container').onclick = (e) => {
+            if(e.target.id === 'drawing-container' || e.target.id === 'cabinet') deselect();
+        }
 
     </script>
 </body>
